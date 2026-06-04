@@ -97,9 +97,67 @@ if "ai_response" not in st.session_state:
     st.session_state.ai_response = None
 if "docx_file" not in st.session_state:
     st.session_state.docx_file = None
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "user_role" not in st.session_state:
+    st.session_state.user_role = "user"
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+import utils.auth_manager as auth_manager
+
+# Sistema de Login Seguro com Firebase
+if not st.session_state.authenticated:
+    st.markdown("---")
+    colA, colB, colC = st.columns([1, 2, 1])
+    with colB:
+        with st.container(border=True):
+            st.subheader("🔒 Acesso Restrito")
+            user_input = st.text_input("Usuário")
+            pass_input = st.text_input("Senha", type="password")
+            if st.button("Entrar", use_container_width=True):
+                user_data = auth_manager.verify_login(user_input, pass_input)
+                if user_data:
+                    st.session_state.authenticated = True
+                    st.session_state.username = user_data["username"]
+                    st.session_state.user_role = user_data["role"]
+                    st.rerun()
+                else:
+                    st.error("Usuário ou senha incorretos! (Ou erro no Firebase)")
+            
+            st.info("💡 Para ativar novos usuários, coloque o arquivo `firebase_key.json` na pasta do app.")
+    st.stop() # Bloqueia o restante do app se não logar!
 
 # Sidebar para API e Configurações
 with st.sidebar:
+    st.markdown(f"👤 Logado como: **{st.session_state.username}**")
+    if st.session_state.user_role == "admin":
+        with st.expander("👑 Painel do Administrador", expanded=False):
+            st.markdown("### Gerenciar Usuários")
+            try:
+                # Criar Usuário
+                with st.form("form_novo_user"):
+                    novo_user = st.text_input("Novo Usuário")
+                    nova_senha = st.text_input("Nova Senha", type="password")
+                    cargo = st.selectbox("Cargo", ["user", "admin"])
+                    if st.form_submit_button("Cadastrar"):
+                        auth_manager.create_user(novo_user, nova_senha, cargo)
+                        st.success(f"Usuário {novo_user} criado!")
+                
+                # Listar / Deletar Usuários
+                st.markdown("---")
+                users = auth_manager.list_users()
+                for u in users:
+                    c1, c2 = st.columns([3, 1])
+                    c1.markdown(f"`{u['username']}` ({u['role']})")
+                    if c2.button("❌", key=f"del_{u['username']}"):
+                        auth_manager.delete_user(u['username'])
+                        st.rerun()
+            except Exception as e:
+                st.error("⚠️ Banco de Dados (Firebase) não configurado.")
+                st.caption(str(e))
+    st.divider()
+    
     st.header("⚙️ Configurações do Sistema")
     
     # Campo de chave API com placeholder mostrando se já tem salvo
@@ -136,6 +194,11 @@ with st.sidebar:
                 st.success("Documentos lidos com sucesso!")
         else:
             st.warning("Envie pelo menos um arquivo.")
+            
+    st.divider()
+    if st.button("🚪 Sair (Logout)", type="secondary"):
+        st.session_state.authenticated = False
+        st.rerun()
 @st.dialog("📄 Pré-visualização da Peça em Página Inteira", width="large")
 def fullscreen_preview_modal(text):
     st.markdown(text)

@@ -4,3 +4,4 @@ requests
 python-docx
 python-dotenv
 PyMuPDF
+firebase-admin
